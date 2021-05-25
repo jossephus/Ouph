@@ -99,10 +99,10 @@ func TestPathJoin(t *testing.T) {
 
 func TestPathNormalize(t *testing.T) {
 	for _, tt := range []struct {
-		path string
-		join string
+		path     string
+		join     string
 		expected string
-	} {
+	}{
 		{"./a/./b/../c", "./d/e/f", "./d/e/a/c"},
 	} {
 		path := NewPath(tt.path)
