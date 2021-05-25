@@ -1,0 +1,85 @@
+package wren
+
+type TokenType string
+
+const (
+	TOKEN_LEFT_PAREN  = "("
+	TOKEN_RIGHT_PAREN = ")"
+
+	TOKEN_LEFT_BRACKET  = "["
+	TOKEN_RIGHT_BRACKET = "]"
+
+	TOKEN_RIGHT_BRACE = "}"
+	TOKEN_LEFT_BRACE  = "{"
+	TOKEN_COLON       = ":"
+	TOKEN_COMMA       = ","
+	TOKEN_STAR        = "*"
+	TOKEN_PERCENT     = "%"
+	TOKEN_TILDE       = "~"
+	TOKEN_QUESTION    = "?"
+
+	TOKEN_PIPE      = "|"
+	TOKEN_PIPE_PIPE = "||"
+
+	TOKEN_EOF  = "TOKEN_EOF"
+	TOKEN_LINE = "TOKEN_LINE"
+
+	TOKEN_AMP    = "&"
+	TOKEN_AMPAMP = "&&"
+	TOKEN_EQ     = "="
+	TOKEN_EQEQ   = "=="
+	TOKEN_BANG   = "!"
+	TOKEN_BANGEQ = "!="
+
+	TOKEN_PLUS  = "+"
+	TOKEN_MINUS = "-"
+
+	TOKEN_DOT       = "."
+	TOKEN_DOTDOT    = ".."
+	TOKEN_DOTDOTDOT = "..."
+
+	TOKEN_SLASH = "/"
+
+	TOKEN_LT   = "<"
+	TOKEN_LTLT = "<<"
+	TOKEN_LTEQ = "<="
+
+	TOKEN_GT   = ">"
+	TOKEN_GTGT = ">>"
+	TOKEN_GTEQ = ">="
+
+	TOKEN_CARET = "^"
+
+	TOKEN_STRING        = "TOKEN_STRING"
+	TOKEN_INTERPOLATION = "TOKEN_INTERPOLATION"
+	TOKEN_NAME          = "TOKEN_NAME"
+	TOKEN_NUMBER        = "TOKEN_NUMBER"
+
+	TOKEN_BREAK     = "TOKEN_BREAK"
+	TOKEN_CONTINUE  = "TOKEN_CONTINUE"
+	TOKEN_CLASS     = "TOKEN_CLASS"
+	TOKEN_CONSTRUCT = "TOKEN_CONSTRUCT"
+	TOKEN_ELSE      = "TOKEN_ELSE"
+	TOKEN_FALSE     = "TOKEN_FALSE"
+	TOKEN_FOR       = "TOKEN_FOR"
+	TOKEN_FOREIGN   = "TOKEN_FOREIGN"
+	TOKEN_IF        = "TOKEN_IF"
+	TOKEN_IMPORT    = "TOKEN_IMPORT"
+	TOKEN_AS        = "TOKEN_AS"
+	TOKEN_IN        = "TOKEN_IN"
+	TOKEN_IS        = "TOKEN_IS"
+	TOKEN_NULL      = "TOKEN_NULL"
+	TOKEN_RETURN    = "TOKEN_RETURN"
+	TOKEN_STATIC    = "TOKEN_STATIC"
+	TOKEN_SUPER     = "TOKEN_SUPER"
+	TOKEN_THIS      = "TOKEN_THIS"
+	TOKEN_TRUE      = "TOKEN_TRUE"
+	TOKEN_VAR       = "TOKEN_VAR"
+	TOKEN_WHILE     = "TOKEN_WHILE"
+)
+
+type Token struct {
+	Type    TokenType
+	Line    int
+	Content string
+}
