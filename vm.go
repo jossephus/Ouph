@@ -1,12 +1,26 @@
 package wren
 
 import (
+	"bytes"
 	"log"
 )
 
 const MaxInterpolationNesting = 8
 
+var FALSE_VAL = BoolValue{Type: VAL_FALSE, value: false}
+var TRUE_VAL = BoolValue{Type: VAL_TRUE, value: true}
+var NULL_VAL = NullValue{Type: VAL_NULL}
+
 type WrenVM struct {
+	stack []Value
+	sp    int
+}
+
+func NewWrenVM() *WrenVM {
+	return &WrenVM{
+		stack: []Value{},
+		sp:    0,
+	}
 }
 
 type GrammarFn func()
@@ -36,184 +50,7 @@ const (
 	PREC_CALL
 )
 
-func (p *Parser) literal() {
-	switch p.previous.Type {
-	case TOKEN_NUMBER:
-		p.out.Write([]byte("\"number"))
-	case TOKEN_STRING:
-		p.out.Write([]byte("\"string"))
-	}
-
-	p.out.Write([]byte("  "))
-	p.out.Write([]byte(p.previous.Content))
-	p.out.Write([]byte("\""))
-}
-
-func (p *Parser) name() {
-	p.out.Write([]byte("\""))
-	p.out.Write([]byte(p.previous.Content))
-	p.out.Write([]byte("\""))
-}
-
-func (p *Parser) list() {
-	p.out.Write([]byte("\"list  [\"\t"))
-
-	defer func() {
-		p.out.Write([]byte("\"]\""))
-	}()
-
-	if p.match(TOKEN_RIGHT_BRACKET) {
-		return
-	}
-
-	p.expression()
-	for p.match(TOKEN_COMMA) {
-		p.out.Write([]byte("\t"))
-
-		if p.peek() == TOKEN_RIGHT_BRACKET {
-			break
-		}
-		p.expression()
-
-	}
-
-	p.consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list elements.")
-
-	p.out.Write([]byte("\t"))
-
-}
-
-func (p *Parser) finishArgumentList() {
-
-	if p.peek() == TOKEN_RIGHT_BRACKET {
-		return
-	}
-
-	p.expression()
-
-	for p.match(TOKEN_COMMA) {
-		if p.peek() == TOKEN_RIGHT_BRACKET {
-			break
-		}
-		p.expression()
-	}
-
-}
-
-func (p *Parser) subscript() {
-	p.out.Write([]byte("\t\"subscript  [\"\t"))
-
-	defer func() {
-		p.out.Write([]byte("\t"))
-		p.out.Write([]byte("\"]\""))
-	}()
-
-	p.finishArgumentList()
-
-	p.consume(TOKEN_RIGHT_BRACKET, "Expect ']' after arguments")
-
-}
-
-func (p *Parser) mapp() {
-	p.out.Write([]byte("\"map  {\""))
-
-	defer func() {
-		p.out.Write([]byte("\t\"}\""))
-	}()
-
-	if p.match(TOKEN_RIGHT_BRACE) {
-		return
-	}
-
-	p.out.Write([]byte("\t"))
-
-	p.parsePrecedence(PREC_UNARY)
-
-	p.out.Write([]byte("\t\":\"\t"))
-	p.consume(TOKEN_COLON, "Expect ':' after map key")
-
-	p.expression()
-
-	for p.match(TOKEN_COMMA) {
-		p.out.Write([]byte("\t\",\"\t"))
-
-		if p.peek() == TOKEN_RIGHT_BRACE {
-			break
-		}
-
-		p.parsePrecedence(PREC_UNARY)
-		p.out.Write([]byte("\t\":\"\t"))
-
-		p.consume(TOKEN_COLON, "Expect ':' after map key")
-
-		p.expression()
-	}
-
-	p.consume(TOKEN_RIGHT_BRACE, "Expect '}' after map entries.")
-}
-
-func (p *Parser) boolean() {
-	p.out.Write([]byte("\"" + p.previous.Content + "\""))
-}
-
-func (p *Parser) grouping() {
-	p.out.Write([]byte("\"grouping"))
-	p.out.Write([]byte("  (\"\t"))
-
-	defer func() {
-		p.out.Write([]byte("\t)"))
-	}()
-
-	p.expression()
-	p.consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression")
-}
-
-func (p *Parser) unaryOp() {
-	//rule := p.rules[p.previous.Type]
-	p.out.Write([]byte("\"" + p.previous.Content + "\"\t"))
-
-	p.parsePrecedence(PREC_UNARY + 1)
-}
-
-func (p *Parser) infixOp() {
-	p.out.Write([]byte("\t\"" + p.previous.Content + "\"\t"))
-
-	rule := p.rules[p.previous.Type]
-
-	p.parsePrecedence(rule.precedence + 1)
-}
-
-func (p *Parser) parsePrecedence(prec Precedence) {
-	p.nextToken()
-
-	prefix := p.rules[p.previous.Type].prefix
-
-	if prefix == nil {
-		log.Fatalf("Expected Expression %s", p.previous.Type)
-	}
-
-	prefix()
-	for prec <= p.rules[p.current.Type].precedence {
-		p.nextToken()
-		infix := p.rules[p.previous.Type].infix
-		infix()
-	}
-	//  prefix = parser.prefix[p.current.Type]
-	//  if prefix == NULL {
-	//    		log.Fatalf("No prefix rule for Token %s", p.current.Type)
-	// }
-	// for
-	//
-	//
-	//
-}
-
-func (p *Parser) expression() {
-	p.parsePrecedence(PREC_LOWEST)
-
-}
-
-func (vm *WrenVM) wrenCompile(module string, source string, isExpr bool, printErrors bool) {
+func (vm *WrenVM) wrenCompile(module string, source string, isExpr bool, printErrors bool) *Compiler {
 	var parser Parser
 
 	parser.vm = vm
@@ -227,14 +64,73 @@ func (vm *WrenVM) wrenCompile(module string, source string, isExpr bool, printEr
 	parser.hasErrors = false
 
 	parser.nextToken()
+	parser.nextToken()
+
+	var out = new(bytes.Buffer)
+	parser.out = out
+
+	compiler := NewCompiler(&parser)
+
+	if isExpr {
+		compiler.expression()
+		compiler.consume(TOKEN_EOF, "Expect End of Expression got %s")
+	}
+
+	compiler.emitOp(CODE_RETURN)
+	compiler.emitOp(CODE_END)
+
+	return compiler
+
 }
 
-func (vm *WrenVM) compileSource(module string, source string, isExpr bool, printErrors bool) {
-	vm.wrenCompile(module, source, isExpr, printErrors)
+func (vm *WrenVM) compileSource(module string, source string, isExpr bool, printErrors bool) *Compiler {
+	return vm.wrenCompile(module, source, isExpr, printErrors)
+}
+
+func (vm *WrenVM) runInterpreter(compiler *Compiler) {
+	for ip := 0; ip < len(compiler.instructions); ip++ {
+		code := Code(compiler.instructions[ip])
+
+		switch code {
+		case CODE_CONSTANT:
+			ip += 2
+			index := uint8(compiler.instructions[ip-2] <<8 | compiler.instructions[ip-1])
+			vm.push(compiler.constants[index])
+		case CODE_TRUE:
+			vm.push(TRUE_VAL)
+		case CODE_FALSE:
+			vm.push(FALSE_VAL)
+		case CODE_NULL:
+			vm.push(NULL_VAL)
+		case CODE_RETURN:
+			vm.pop()
+		case CODE_END:
+		}
+	}
 }
 
 func (vm *WrenVM) Interpret(module string, source string) {
-	vm.compileSource(module, source, false, true)
+	compiler := vm.compileSource(module, source, true, true)
+
+	vm.runInterpreter(compiler)
+}
+
+func (vm *WrenVM) push(value Value) {
+	vm.stack = append(vm.stack, value)
+	vm.sp++
+}
+
+func (vm *WrenVM) pop() Value {
+	vm.sp--
+	return vm.stack[vm.sp]
+}
+
+func (vm *WrenVM) StackTop() Value {
+	return vm.stack[vm.sp]
+	if vm.sp == 0 {
+		log.Fatalf("No stack top")
+	}
+	return vm.stack[vm.sp-1]
 }
 
 type WrenInterpretResult int
@@ -275,7 +171,6 @@ func WrenFreeVM(vm *WrenVM) {
 }
 
 func WrenNewVM(config *WrenConfiguration) *WrenVM {
-
 	if config != nil {
 
 	}

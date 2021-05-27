@@ -82,4 +82,5 @@ type Token struct {
 	Type    TokenType
 	Line    int
 	Content string
+	value Value
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"strconv"
 )
 
 type Parser struct {
@@ -25,22 +26,11 @@ type Parser struct {
 	parens    [MaxInterpolationNesting]int
 	numParens int
 
-	rules map[TokenType]GrammarRule
-
 	out io.Writer
 }
 
 func (p *Parser) addRule(typ TokenType, rule GrammarRule) {
-	p.rules[typ] = rule
-}
-
-func (p *Parser) consume(typ TokenType, err string) {
-	p.nextToken()
-
-	if p.previous.Type != typ {
-		log.Fatalf("Error in consume: %q", err)
-		log.Fatalf("Expected %s. got %s", typ, p.previous.Type)
-	}
+	//p.rules[typ] = rule
 }
 
 func (parser *Parser) peekChar() byte {
@@ -155,8 +145,18 @@ func (p *Parser) readString() {
 
 	buf.WriteByte('"')
 	p.next.Type = typ
-	p.next.Content = buf.String()
+
+	content := buf.String()
+	
+	p.next.Content = content
 	p.next.Line = p.currentLine
+	p.next.value = ObjectValue{
+		Type: VAL_OBJ, 
+		Obj: StringObject{ 
+			Type: OBJ_STRING, 
+			Value: content[1: len(content) - 1],
+		},
+	}
 }
 
 func isName(ch byte) bool {
@@ -209,7 +209,11 @@ func (p *Parser) makeNumber(isHex bool) {
 	if isHex {
 
 	} else {
-
+		v, err := strconv.ParseFloat(p.source[p.offset:p.rdOffset], 64)
+		if err != nil {
+			log.Fatalf("Somekind of error in parser.go makeNumber")
+		}
+		p.next.value = NumValue{Number: v}
 	}
 
 	p.makeToken(TOKEN_NUMBER)
