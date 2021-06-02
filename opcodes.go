@@ -44,6 +44,9 @@ const (
 	CODE_METHOD_INSTANCE
 
 	CODE_CLOSURE
+
+	CODE_CONSTRUCT
+	CODE_FOREIGN_CONSTRUCT
 )
 
 type Instructions []int
@@ -152,6 +155,8 @@ func (ins Instructions) dumpInstruction(buf *bytes.Buffer, i int, lastLine int, 
 		i += 2
 		symbol := ins[i-2]<<8 | ins[i-1]
 		fmt.Fprintf(buf, "%-16s %5d", "METHOD_INSTANCE", symbol)
+	case CODE_CONSTRUCT:
+		fmt.Fprintf(buf, "CONSTRUCT\n")
 	default:
 		fmt.Fprintf(buf, "Unhandled Opcode in dumpInstruction %d", bytecode)
 	}

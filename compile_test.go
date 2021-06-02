@@ -299,7 +299,10 @@ func TestCompileClasses(t *testing.T) {
 		bar() {
 
 		}
-	}`
+	}
+	var b = Foo.name
+	b
+	`
 
 	expected := `
 
@@ -315,5 +318,26 @@ func TestCompileClasses(t *testing.T) {
 
 	if compiler.instructions.String(compiler) != expected {
 		t.Errorf("Compile[%q]: expected: \n`%q`, \n\ngot \n`%q`", src, expected, compiler.instructions.String(compiler))
+	}
+}
+func TestCompileConstructors(t *testing.T) {
+	src := `class Foo {
+		construct new() {}
+	}`
+
+	expected := `
+
+	`
+	vm := NewWrenVM()
+
+	module := &ObjModule{
+		VariableNames: make(map[string]Demo),
+		variables:     make([]Value, 65535),
+	}
+
+	compiler := vm.wrenCompile(module, src, false, false)
+
+	if compiler.instructions.String(compiler) != expected {
+		t.Errorf("Compile[%q]: expected: \n`%q`, \n\ngot \n`%s`", src, expected, compiler.instructions.String(compiler))
 	}
 }

@@ -70,7 +70,7 @@ type Signature struct {
 	Type   SigType
 }
 
-type SignatureFn func(signature *Signature)
+type SignatureFn func(signature *Signature) *Signature
 
 type Scope uint
 
@@ -152,6 +152,7 @@ func NewCompiler(parser *Parser, isMethod bool) *Compiler {
 
 	c.rules[TOKEN_LEFT_PAREN] = GrammarRule{c.grouping, nil, PREC_NONE}
 	c.rules[TOKEN_LEFT_BRACKET] = GrammarRule{c.list, c.subscript, PREC_CALL}
+	c.rules[TOKEN_IS] = GrammarRule{nil, c.infixOp, PREC_IS}
 
 	return c
 }
@@ -450,6 +451,10 @@ func (c *Compiler) signatureToString(signature *Signature) string {
 	case SIG_SUBSCRIPT:
 		c.signatureParameterList(&buf, signature.Name, signature.Arity, '[', ']')
 	case SIG_GETTER:
+	case SIG_INITIALIZER:
+		buf.WriteString("init ")
+		buf.WriteString(signature.Name)
+		c.signatureParameterList(&buf, signature.Name, signature.Arity, '(', ')')
 	default:
 		log.Fatalf("compiler.signatureToString with type unhandled %t", signature.Type == SIG_GETTER)
 	}
@@ -875,7 +880,7 @@ func getByteCountForArguments(instruction Instructions, constants []Value, ip in
 	code := instruction[ip]
 
 	switch Code(code) {
-	case CODE_NULL, CODE_FALSE, CODE_TRUE, CODE_POP, CODE_RETURN, CODE_END:
+	case CODE_NULL, CODE_FALSE, CODE_TRUE, CODE_POP, CODE_RETURN, CODE_END, CODE_LOAD_LOCAL_0, CODE_CONSTRUCT:
 		return 0
 	case CODE_LOAD_MODULE_VAR, CODE_STORE_MODULE_VAR, CODE_LOOP, CODE_CONSTANT,
 		CODE_CALL_0, CODE_CALL_1, CODE_JUMP_IF:
@@ -1115,14 +1120,54 @@ func (c *Compiler) parameterList(signature *Signature) {
 	c.consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters")
 }
 
-func (c *Compiler) namedSignature(signature *Signature) {
+func (c *Compiler) namedSignature(signature *Signature) *Signature {
 	signature.Type = SIG_GETTER
 
 	if c.mayBeSetter(signature) {
-		return
+		return signature
 	}
 
 	c.parameterList(signature)
+	return signature
+}
+
+func (c *Compiler) constructSignature(signature *Signature) *Signature {
+	c.consume(TOKEN_NAME, "Expect constructor name after 'construct'")
+
+	signature = c.signatureFromToken(SIG_INITIALIZER)
+
+	if c.match(TOKEN_EQ) {
+		log.Fatalf("a constructor cannot be a setter")
+	}
+
+	if !c.match(TOKEN_LEFT_PAREN) {
+		log.Fatalf("a constructor cannot be a getter")
+	}
+
+	if c.match(TOKEN_RIGHT_PAREN) {
+		return signature
+	}
+
+	c.finishParameterList(signature)
+	c.consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters")
+	return signature
+}
+
+func (c *Compiler) createConstructor(signature *Signature, initializerSymbol int)  {
+	methodCompiler := NewCompiler(c.parser, true)
+	methodCompiler.parent = c
+
+	if c.enclosingClass.isForeign {
+		methodCompiler.emitOp(CODE_FOREIGN_CONSTRUCT)
+	} else {
+		methodCompiler.emitOp(CODE_CONSTRUCT)
+	}
+
+	methodCompiler.emitShortArg(CODE_CALL_0 + Code(signature.Arity), initializerSymbol)
+
+	methodCompiler.emitOp(CODE_RETURN)
+
+	methodCompiler.endCompiler("", 0)
 }
 
 func (c *Compiler) method(classVar Variable) bool {
@@ -1132,7 +1177,16 @@ func (c *Compiler) method(classVar Variable) bool {
 	c.enclosingClass.inStatic = isStatic
 
 	var signatureFn SignatureFn
-	signatureFn = c.namedSignature
+
+	switch c.parser.current.Type {
+	case TOKEN_NAME:
+		signatureFn = c.namedSignature
+	case TOKEN_CONSTRUCT:
+		signatureFn = c.constructSignature
+	default:
+		log.Fatalf("in c.method with token %s", c.parser.current.Type)
+	}
+
 
 	c.parser.nextToken()
 
@@ -1147,7 +1201,7 @@ func (c *Compiler) method(classVar Variable) bool {
 	var methodCompiler = NewCompiler(c.parser, false)
 	methodCompiler.parent = c
 
-	signatureFn(signature)
+	signature = signatureFn(signature)
 
 	fullSignature := c.signatureToString(signature)
 
@@ -1165,7 +1219,11 @@ func (c *Compiler) method(classVar Variable) bool {
 	c.defineMethod(classVar, isStatic, methodSymbol)
 
 	if signature.Type == SIG_INITIALIZER {
-		log.Fatalf("hello world")
+		signature.Type = SIG_METHOD
+		constructorSymbol := c.signatureSymbol(signature)
+
+		c.createConstructor(signature,methodSymbol)
+		c.defineMethod(classVar, true, constructorSymbol)
 	}
 
 	return true

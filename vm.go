@@ -914,24 +914,39 @@ func (vm *WrenVM) getClass(value Value) *ObjClass {
 func (vm *WrenVM) runInterpreter(fiber *ObjFiber) WrenInterpretResult {
 	vm.fiber = fiber
 
-	frame := fiber.frames[fiber.numFrames-1]
-	//stackStart := frame.stackStart
+	/*frame := fiber.frames[fiber.numFrames-1]
+	stackStart := frame.stackStart
 	ip := frame.ip
 	fn := frame.closure.fn
+	*/
 	//log.Fatalf("%s", fn.instructions.String(fn))
 
-	if len(fn.instructions) == 0 {
-		log.Fatalf("No instructions ")
-	}
+	var frame *CallFrame
+	var fn *ObjFn
+	var ip int
+	var stackStart int
+	var code Code
 
-	for ip < len(fn.instructions) {
-		code := Code(fn.instructions[ip])
+	emittedEnds := 0
+
+	for {
+		//:for ip < len(fn.instructions) {
+		frame = fiber.frames[fiber.numFrames-1]
+
+		stackStart = frame.stackStart
+		
+		ip = frame.ip
+		
+		fn = frame.closure.fn
+
+		code = Code(fn.instructions[ip])
+
 
 		switch code {
 		case CODE_CONSTANT:
-			ip += 2
+			frame.ip += 2
 			//index := int8(fn.instructions[ip-2]<<8 | fn.instructions[ip-1])
-			index := (fn.instructions[ip-1]<<8 | fn.instructions[ip])
+			index := (fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip])
 			vm.push(fn.constants[index])
 		case CODE_RETURN:
 			//vm.pop()
@@ -942,9 +957,9 @@ func (vm *WrenVM) runInterpreter(fiber *ObjFiber) WrenInterpretResult {
 		case CODE_NULL:
 			vm.push(NULL_VAL)
 		case CODE_CALL_0, CODE_CALL_1:
-			numArgs := fn.instructions[ip] - int(CODE_CALL_0)
-			ip += 2
-			symbol := fn.instructions[ip-1]<<8 | fn.instructions[ip]
+			numArgs := fn.instructions[frame.ip] - int(CODE_CALL_0)
+			frame.ip += 2
+			symbol := fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip]
 			args := fiber.stack[fiber.stackTop-numArgs-1 : fiber.stackTop]
 
 			classObj := vm.getClass(args[0])
@@ -953,6 +968,10 @@ func (vm *WrenVM) runInterpreter(fiber *ObjFiber) WrenInterpretResult {
 			//	log.Fatalf("CODE_CALL_0. error ")
 			//}
 			method, ok := classObj.methods[vm.functionNames[symbol]]
+
+			log.Printf("%v", classObj.methods)
+			log.Printf("%#v", vm.functionNames)
+			log.Printf("%v", vm.functionNames[symbol])
 
 			if !ok {
 				log.Fatalf("CODE_CALL_0. error 2")
@@ -967,55 +986,70 @@ func (vm *WrenVM) runInterpreter(fiber *ObjFiber) WrenInterpretResult {
 				if method.primitive(vm, args) {
 
 				}
+			case METHOD_BLOCK:
+				//old := frame.ip	
+				fiber.frames[fiber.numFrames] = NewFrame(method.Closure, fiber.stackTop - numArgs)
+				fiber.numFrames++
+				vm.push(ObjectValue{
+					Type: VAL_OBJ,
+					Obj: classObj,
+				})
+
 			default:
 				log.Fatalf("We here CODE_CALL_0. error 4")
 			}
 		case CODE_STORE_MODULE_VAR:
-			ip += 2
-			index := (fn.instructions[ip-1]<<8 | fn.instructions[ip])
+			frame.ip += 2
+			index := (fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip])
 			fn.module.variables[index] = vm.peek()
 		case CODE_LOAD_MODULE_VAR:
-			ip += 2
-			index := (fn.instructions[ip-1]<<8 | fn.instructions[ip])
+			frame.ip += 2
+			index := (fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip])
 			vm.push(fn.module.variables[index])
 		case CODE_POP:
 			vm.drop()
 		case CODE_END:
+			if emittedEnds == 0 {
+				return WrenResultSuccess
+			}
+			emittedEnds--
 		case CODE_JUMP_IF:
-			ip += 2
-			offset := fn.instructions[ip-1]<<8 | fn.instructions[ip]
+			frame.ip += 2
+			offset := fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip]
 
 			condition := vm.pop()
 
 			if isFalse(condition) || isFalse(condition) {
-				ip += offset
+				frame.ip += offset
 			}
 		case CODE_JUMP:
-			ip += 2
-			offset := fn.instructions[ip-1]<<8 | fn.instructions[ip]
+			frame.ip += 2
+			offset := fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip]
 
-			ip += offset
+			frame.ip += offset
 		case CODE_LOOP:
-			ip += 2
-			offset := fn.instructions[ip-1]<<8 | fn.instructions[ip]
-			ip -= offset
+			frame.ip += 2
+			offset := fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip]
+			frame.ip -= offset
 		case CODE_CLASS:
-			ip += 1
-			numFields := fn.instructions[ip]
+			frame.ip += 1
+			numFields := fn.instructions[frame.ip]
 			vm.createClass(numFields, nil)
-		case CODE_METHOD_INSTANCE:
-			ip += 2
-			offset := fn.instructions[ip-1]<<8 | fn.instructions[ip]
+		case CODE_METHOD_STATIC, CODE_METHOD_INSTANCE:
+			frame.ip += 2
+			offset := fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip]
 			//log.Fatalf("offset %d", offset)
-			classObj := vm.peek().(ObjectValue).Obj.(*ObjClass)
+			//classObj := vm.peek().(ObjectValue).Obj.(*ObjClass)
 			method := vm.peek2()
 
-			vm.bindMethod(fn.instructions[ip], offset, fn.module, classObj, method)
+			vm.bindMethod(fn.instructions[frame.ip], code, offset, fn.module, vm.peek(), method)
+
 			vm.drop()
 			//vm.drop()
 		case CODE_CLOSURE:
-			ip += 2
-			constant := fn.instructions[ip-1]<<8 | fn.instructions[ip]
+			emittedEnds++
+			frame.ip += 2
+			constant := fn.instructions[frame.ip-1]<<8 | fn.instructions[frame.ip]
 
 			function := fn.constants[constant].(ObjectValue).Obj.(*ObjFn)
 			closure := NewClosure(function)
@@ -1028,14 +1062,35 @@ func (vm *WrenVM) runInterpreter(fiber *ObjFiber) WrenInterpretResult {
 			for i := 0; i < function.numUpvalues; i++ {
 
 			}
+		case CODE_CONSTRUCT:
+			if _, ok := fiber.stack[stackStart].(ObjectValue).Obj.(*ObjClass); !ok {
+				log.Fatalf("not an object in top of stack. on CODE_CONSTRUCT")
+			}
+
+			fiber.stack[stackStart] = ObjectValue{
+				Type: VAL_OBJ,
+				Obj: NewInstance(fiber.stack[stackStart].(ObjectValue).Obj.(*ObjClass)),
+				Object: Object{
+					classObj: fiber.stack[stackStart].(ObjectValue).Obj.(*ObjClass),
+				},
+			}
+		case CODE_LOAD_LOCAL_0:
+			log.Fatalf("%#v", fiber.stack[int(code)-int(CODE_LOAD_LOCAL_0)])
 		default:
-			log.Fatalf("We are here in vm.go runInterpreter")
+			log.Fatalf("We are here in vm.go runInterpreter %v", code)
 		}
 
-		ip++
+		frame.ip++
 	}
 
 	return WrenResultRuntimeError
+}
+
+func (vm *WrenVM) callFunction(fiber *ObjFiber, closure *ObjClosure, numArgs int) {
+	//frame := &fiber.frames[fiber.numFrames]
+	//fiber.numFrames++
+	//frame.stackStart = fiber.stackTop - numArgs
+	//fame.closure = closure
 }
 
 func (vm *WrenVM) wrenBindMethod(classObj *ObjClass, symbol int, method *Method) {
@@ -1051,16 +1106,26 @@ func (vm *WrenVM) bindMethodCode(classObj *ObjClass, fn *ObjFn) {
 	for {
 		instruction := Code(fn.instructions[ip])
 		switch instruction {
+		case CODE_NULL, CODE_RETURN, CODE_LOAD_LOCAL_0, CODE_CALL_0, CODE_CONSTRUCT:
+		case CODE_END:
+			return
 		default:
 			log.Fatalf("vm.bindMethodCode instruction %d", instruction)
 		}
+
+		ip += 1 + getByteCountForArguments(fn.instructions, fn.constants, ip)
 	}
 
 }
 
-func (vm *WrenVM) bindMethod(methodType int, symbol int, module *ObjModule, classObj *ObjClass, methodValue Value) {
+func (vm *WrenVM) bindMethod(methodType int, code Code, symbol int, module *ObjModule, value Value, methodValue Value) {
 	//className := classObj.name
-
+	var classObj *ObjClass
+	if code == CODE_METHOD_STATIC {
+		classObj = value.(ObjectValue).classObj
+	} else {
+		classObj = value.(ObjectValue).Obj.(*ObjClass)
+	}
 	var method = &Method{}
 	objVal, ok := methodValue.(ObjectValue)
 
@@ -1078,7 +1143,6 @@ func (vm *WrenVM) bindMethod(methodType int, symbol int, module *ObjModule, clas
 
 		vm.bindMethodCode(classObj, method.Closure.fn)
 	}
-
 	vm.wrenBindMethod(classObj, symbol, method)
 
 }

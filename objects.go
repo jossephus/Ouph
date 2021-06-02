@@ -66,3 +66,13 @@ func NewClosure(fn *ObjFn) *ObjClosure {
 		fn: fn,
 	}
 }
+
+func NewInstance(class *ObjClass) *ObjInstance {
+	return &ObjInstance{
+		Type: OBJ_INSTANCE,
+		Object: Object{
+			classObj: class,
+		},
+	}
+
+}

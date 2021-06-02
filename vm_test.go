@@ -8,8 +8,8 @@ func TestInterpretBooleans(t *testing.T) {
 		expected bool
 	}{
 		{"true", true},
-		{`"hello world".contains("hello")`, true},
-		{`"hello world".contains("hwor")`, false},
+		//{`"hello world".contains("hello")`, true},
+		//{`"hello world".contains("hwor")`, false},
 	} {
 		vm := NewWrenVM()
 
@@ -35,8 +35,8 @@ func TestInterpretIntegers(t *testing.T) {
 		expected float64
 	}{
 		{"1", 1.0},
-		{"1.3.floor", 1.0},
-		{"1.3.ceil", 2.0},
+		//{"1.3.floor", 1.0},
+		//{"1.3.ceil", 2.0},
 	} {
 		vm := NewWrenVM()
 
@@ -518,14 +518,14 @@ func TestClassStatements(t *testing.T) {
 		src      string
 		expected string
 	}{
-	//	{
-	//		`class Foo {}
-//var a = Foo.name
-//a`, "Foo"},
+		/*{
+			`class Foo {}
+var a = Foo.name
+a`, "Foo"},*/
 		{
 			`class Bar {
 				bar(a) {}
-}
+		}
 var b = Bar.name
 b`, "Bar"},
 	} {
@@ -536,7 +536,7 @@ b`, "Bar"},
 		value := vm.StackTop()
 
 		if value.ValueType() != VAL_OBJ {
-			t.Errorf("Value.Type: expected VAL_STRING: got %v", value.ValueType())
+			t.Fatalf("Value.Type: expected VAL_STRING: got %v", value.ValueType())
 		}
 
 		str, ok := value.(ObjectValue).Obj.(StringObject)
@@ -550,6 +550,39 @@ b`, "Bar"},
 		}
 
 	}
+}
+
+func TestCreateObjects(t *testing.T) {
+	for _, tt := range []struct{
+		src string
+		expected bool
+	}{
+		{	
+`class Foo {
+	construct new() {}
+}
+var a = Foo.new()
+a is Foo`, true,
+		},
+	}{
+		vm := NewWrenVM()
+
+		vm.Interpret("", tt.src, false)
+
+		value := vm.StackTop()
+
+		if value.ValueType() != VAL_TRUE && value.ValueType() != VAL_FALSE {
+			t.Errorf("value.Type: expected VAL_TRUE or VAL_FALSE. got %v", value.ValueType())
+		}
+
+		bool_val := value.(BoolValue).value
+
+		if bool_val != tt.expected {
+			t.Errorf("%s: expected %t got %t", tt.src, tt.expected, bool_val)
+		}
+
+	}
+
 }
 
 /*

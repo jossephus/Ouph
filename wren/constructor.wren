@@ -5,3 +5,4 @@ class Foo {
 }
 
 var a = Foo.new()
+System.print(a is Foo)

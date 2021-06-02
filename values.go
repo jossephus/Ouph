@@ -13,6 +13,7 @@ const (
 	OBJ_MODULE
 	OBJ_RANGE
 	OBJ_CLASS
+	OBJ_INSTANCE
 )
 
 type Object struct {
@@ -254,4 +255,17 @@ func (or *ObjRange) PrintObject() string {
 	}
 
 	return fmt.Sprintf("%.f%s%.f", or.from, sep, or.to)
+}
+
+type ObjInstance struct {
+	Type ObjType
+	Object Object
+}
+
+func (or *ObjInstance) ObjType() ObjType {
+	return or.Type
+}
+
+func (oi *ObjInstance) PrintObject() string {
+	return fmt.Sprintf("Instance[%p]", oi)
 }
