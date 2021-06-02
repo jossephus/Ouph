@@ -6,7 +6,8 @@ func NewFiber(vm *WrenVM, closure *ObjClosure) *ObjFiber {
 	fiber := &ObjFiber{
 		Type: OBJ_FIBER,
 		//TODO: make([]Value, powerOf2(closure->fn->maxSlots + 1))
-		stack:     make([]Value, 6553335),
+		//stack:     make([]Value, 6553335),
+		stack:     make([]Value, 65535),
 		stackTop:  0,
 		frames:    frames,
 		numFrames: 0,
