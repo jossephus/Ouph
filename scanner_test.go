@@ -70,8 +70,13 @@ func TestScansOperators(t *testing.T) {
 func TestReadString(t *testing.T) {
 	t.Run("reads regular strings", func(t *testing.T) {
 		src := `"hello world"`
+		
+		vm := NewWrenVM()
 
 		var parser Parser
+
+		parser.vm = vm
+
 		parser.source = src
 		parser.rdOffset = 0
 		parser.offset = 0
@@ -90,7 +95,11 @@ func TestReadString(t *testing.T) {
 	t.Run("Reads \\ strings too ", func(t *testing.T) {
 		src := `"\n \0 \a \" \b \f \r \t \v"`
 
+		vm := NewWrenVM()
+
 		var parser Parser
+
+		parser.vm = vm
 
 		parser.source = src
 		parser.rdOffset = 0
@@ -110,7 +119,11 @@ func TestReadString(t *testing.T) {
 	t.Run("Read String Interpolations ", func(t *testing.T) {
 		src := `"%( %(a) )"`
 
+		vm := NewWrenVM()
+
 		var parser Parser
+
+		parser.vm = vm
 
 		parser.source = src
 		parser.rdOffset = 0
@@ -131,7 +144,11 @@ func TestReadString(t *testing.T) {
 		// from wren_compiler.c
 		src := `"a %(b) c %(d) e"`
 
+		vm := NewWrenVM()
+
 		var parser Parser
+
+		parser.vm = vm
 
 		parser.source = src
 		parser.offset = 0

@@ -9,7 +9,7 @@ import (
 
 type Parser struct {
 	vm          *WrenVM
-	module      string
+	module      *ObjModule
 	source      string
 	printErrors bool
 	hasErrors   bool
@@ -27,6 +27,8 @@ type Parser struct {
 	numParens int
 
 	out io.Writer
+
+	hasError bool
 }
 
 func (p *Parser) addRule(typ TokenType, rule GrammarRule) {
@@ -147,14 +149,17 @@ func (p *Parser) readString() {
 	p.next.Type = typ
 
 	content := buf.String()
-	
+
 	p.next.Content = content
 	p.next.Line = p.currentLine
 	p.next.value = ObjectValue{
-		Type: VAL_OBJ, 
-		Obj: StringObject{ 
-			Type: OBJ_STRING, 
-			Value: content[1: len(content) - 1],
+		Type: VAL_OBJ,
+		Obj: StringObject{
+			Type:  OBJ_STRING,
+			Value: content[1 : len(content)-1],
+		},
+		Object: Object{
+			classObj: p.vm.stringClass,
 		},
 	}
 }
@@ -275,7 +280,7 @@ func (p *Parser) readHexNumber() {
 }
 
 func (p *Parser) skipLineComment() {
-	for p.peekChar() == '\n' && p.peekChar() == 0 {
+	for p.peekChar() != '\n' && p.peekChar() != 0 {
 		p.nextChar()
 	}
 }
@@ -372,7 +377,12 @@ func (p *Parser) nextToken() {
 			p.makeToken(TOKEN_DOT)
 			return
 		case '/':
+			if p.matchChar('/') {
+				p.skipLineComment()
+				break
+			}
 			p.makeToken(TOKEN_SLASH)
+
 			return
 		case '<':
 			if p.matchChar('<') {

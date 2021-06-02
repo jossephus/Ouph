@@ -14,6 +14,7 @@ func main() {
 	fmt.Printf(`\\/"-
  \_/	wren	
  `)
+	vm := wren.NewWrenVM()
 
 	for {
 		fmt.Printf(">> ")
@@ -26,9 +27,12 @@ func main() {
 
 		line := scanner.Text()
 
-		vm := wren.NewWrenVM()
+		result := vm.Interpret("", line, false)
 
-		vm.Interpret("", line)
+		if result == wren.WrenResultCompileError {
+			fmt.Printf("Compiler error\n")
+			continue
+		}
 
 		value := vm.StackTop()
 

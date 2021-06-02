@@ -8,7 +8,16 @@ type ObjType uint
 
 const (
 	OBJ_STRING ObjType = iota
+	OBJ_FIBER
+	OBJ_CLOSURE
+	OBJ_MODULE
+	OBJ_RANGE
+	OBJ_CLASS
 )
+
+type Object struct {
+	classObj *ObjClass
+}
 
 type Obj interface {
 	ObjType() ObjType
@@ -84,7 +93,8 @@ func (sv StringValue) Print() string {
 
 type ObjectValue struct {
 	Type ValueType
-	Obj Obj
+	Obj  Obj
+	Object
 }
 
 func (sv ObjectValue) ValueType() ValueType {
@@ -96,7 +106,7 @@ func (sv ObjectValue) Print() string {
 }
 
 type StringObject struct {
-	Type ObjType
+	Type  ObjType
 	Value string
 }
 
@@ -106,4 +116,142 @@ func (so StringObject) ObjType() ObjType {
 
 func (so StringObject) PrintObject() string {
 	return so.Value
+}
+
+type ObjFn struct {
+	numUpvalues int
+
+	Type      ObjType
+	constants []Value
+
+	instructions Instructions
+
+	numUpValues int
+
+	module *ObjModule
+}
+
+func (of *ObjFn) ObjType() ObjType {
+	return of.Type
+}
+
+func (of *ObjFn) PrintObject() string {
+	return fmt.Sprintf("Fn: [%p]", of)
+}
+
+type ObjUpvalue struct {
+	value  *Value
+	closed Value
+}
+
+type ObjClosure struct {
+	Type ObjType
+
+	fn *ObjFn
+
+	upvalues []*ObjUpvalue
+}
+
+func (oc *ObjClosure) ObjType() ObjType {
+	return oc.Type
+}
+
+func (oc *ObjClosure) PrintObject() string {
+	return fmt.Sprintf("Closure: [%p]", oc)
+}
+
+type CallFrame struct {
+	ip int
+
+	closure *ObjClosure
+
+	stackStart int
+
+	stack []Value
+}
+
+type ObjFiber struct {
+	Type ObjType
+
+	stack []Value
+
+	stackTop int
+
+	frames []*CallFrame
+
+	numFrames int
+}
+
+type MethodType uint
+
+const (
+	METHOD_PRIMITIVE MethodType = iota
+	METHOD_BLOCK
+	METHOD_NONE
+)
+
+type Primitive func(*WrenVM, []Value) bool
+
+type Method struct {
+	Type      MethodType
+	primitive Primitive
+	Closure   *ObjClosure
+}
+
+type ObjClass struct {
+	Type       ObjType
+	name       string
+	methods    map[string]*Method
+	superclass *ObjClass
+}
+
+func (oc *ObjClass) ObjType() ObjType {
+	return oc.Type
+}
+
+func (oc *ObjClass) PrintObject() string {
+	return fmt.Sprintf("Class: %s", oc.name)
+}
+
+type Demo struct {
+	value Value
+	index int
+}
+
+type ObjModule struct {
+	Type          ObjType
+	VariableNames map[string]Demo
+	//VariableNames map[string]map[Value]int
+	//VariableNames map[string]Value
+	variables []Value
+	Name      Value
+}
+
+func (om *ObjModule) ObjType() ObjType {
+	return om.Type
+}
+
+func (om *ObjModule) PrintObject() string {
+	return fmt.Sprintf("Module: [%p]", om)
+}
+
+type ObjRange struct {
+	Type        ObjType
+	from        float64
+	to          float64
+	isInclusive bool
+}
+
+func (or *ObjRange) ObjType() ObjType {
+	return or.Type
+}
+
+func (or *ObjRange) PrintObject() string {
+	sep := "..."
+
+	if or.isInclusive {
+		sep = ".."
+	}
+
+	return fmt.Sprintf("%.f%s%.f", or.from, sep, or.to)
 }

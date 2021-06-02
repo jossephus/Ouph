@@ -31,16 +31,39 @@ func main() {
 		return
 	}
 
-	testName := os.Args[1]
-	var result wren.WrenInterpretResult = runFile(vm, testName)
+	filename := os.Args[1]
 
-	if result == wren.WrenResultCompileError {
-	} else if result == wren.WrenResultRuntimeError {
+	content, err := readFile(filename)
 
+	if err != nil {
+		log.Fatalf("Could not open file %s\n", filename)
 	}
 
-	wren.WrenFreeVM(vm)
+	vm := wren.NewWrenVM()
 
+	vm.Interpret("", content, false)
+
+	value := vm.StackTop()
+
+	fmt.Printf("%s",value.Print())
+
+	/*
+		handled := handle_args(os.Args)
+
+		if handled != 0 {
+			return
+		}
+
+		testName := os.Args[1]
+		var result wren.WrenInterpretResult = runFile(vm, testName)
+
+		if result == wren.WrenResultCompileError {
+		} else if result == wren.WrenResultRuntimeError {
+
+		}
+
+		wren.WrenFreeVM(vm)
+	*/
 }
 
 func initVM(vm *wren.WrenVM) *wren.WrenVM {
@@ -80,8 +103,8 @@ func runFile(vm *wren.WrenVM, filename string) wren.WrenInterpretResult {
 
 	module.removeExtension()
 
-	var result wren.WrenInterpretResult = vm.Interpret(module.String(), content)
+	var result wren.WrenInterpretResult = vm.Interpret(module.String(), content, false)
 
-	return wren.WrenResultSuccess
+	return result
 
 }
